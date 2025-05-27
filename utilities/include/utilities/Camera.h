@@ -5,272 +5,75 @@
 #ifndef CONSERVATION_UTILITIES_CAMERA_H
 #define CONSERVATION_UTILITIES_CAMERA_H
 
-#include "utilities/constants.h"
-#include "utilities/Spatial.h"
-
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
-
 #include <memory>
-#include <optional>
-#include <string>
-#include <unordered_map>
-#include <vector>
+#include <GLFW/glfw3.h>
+#include <glm/matrix.hpp>
+#include <glm/vec3.hpp>
 
 namespace csv
 {
-    enum class CameraType
-    {
-        Perspective,
-        Orthographic
-    };
-
-    enum class CameraMode
-    {
-        FirstPerson,
-        Orbital,
-        Free
-    };
-
-    // Input action mapping
-    enum class CameraAction
-    {
-        MoveForward,
-        MoveBackward,
-        MoveLeft,
-        MoveRight,
-        MoveUp,
-        MoveDown,
-        RotateCamera,
-        ZoomIn,
-        ZoomOut
-    };
-
-    // Forward declaration
-    class CameraController;
-
-    class Camera final : public Spatial
+    class Camera
     {
     public:
-        struct CameraSettings
-        {
-            float fieldOfView{ constants::DEFAULT_FOV };
-            float aspectRatio{ constants::DEFAULT_ASPECT_RATIO };
-            float nearPlane{ constants::DEFAULT_NEAR_PLANE };
-            float farPlane{ constants::DEFAULT_FAR_PLANE };
-            float mouseSensitivity{ constants::DEFAULT_MOUSE_SENSITIVITY };
-            CameraType type{ CameraType::Perspective };
-            CameraMode mode{ CameraMode::Free };
-        };
+        explicit Camera(float left = -1.0f,
+                        float right = 1.0f,
+                        float bottom = -1.0f,
+                        float top = 1.0f,
+                        float nearPlane = 0.1f,
+                        float farPlane = 100.0f) noexcept;
 
-        static const CameraSettings DEFAULT_CAMERA_SETTINGS;
+        [[nodiscard]] glm::mat4 getModelMatrix() const noexcept;
+
+        [[nodiscard]] glm::mat4 getViewMatrix() const noexcept;
+
+        [[nodiscard]] glm::mat4 getProjectionMatrix() const noexcept;
+
+        void setPosition(const glm::vec3& position) noexcept;
+
+        void setTarget(const glm::vec3& target) noexcept;
+
+        void setUp(const glm::vec3& up) noexcept;
+
+        void setOrthographicProjection(float left,
+                                       float right,
+                                       float bottom,
+                                       float top,
+                                       float nearPlane,
+                                       float farPlane) noexcept;
 
     private:
-        // Camera-specific parameters
-        CameraSettings m_settings;
+        void updateProjectionMatrix() noexcept;
 
-        // Target (for orbital camera)
-        std::optional<glm::vec3> m_target;
-        float m_orbitDistance{ constants::DEFAULT_ORBIT_DISTANCE };
+        glm::vec3 m_position;
+        glm::vec3 m_target;
+        glm::vec3 m_up;
 
-        // Controller
-        std::unique_ptr<CameraController> m_controller;
+        float m_left;
+        float m_right;
+        float m_bottom;
+        float m_top;
+        float m_near;
+        float m_far;
 
-        // Cache for matrices
-        struct Cache
-        {
-            bool viewDirty{ true };
-            bool projectionDirty{ true };
-            glm::mat4 viewMatrix{ 1.0f };
-            glm::mat4 projectionMatrix{ 1.0f };
-        };
-
-        std::unique_ptr<Cache> m_cache;
-
-        // Override from Spatial
-        void onSpatialChanged() override;
-
-    public:
-        explicit Camera(const CameraSettings& settings = DEFAULT_CAMERA_SETTINGS);
-
-        // Copy/move constructors and assignment operators
-        Camera(const Camera& other);
-        Camera(Camera&& other) noexcept;
-        Camera& operator=(const Camera& other);
-        Camera& operator=(Camera&& other) noexcept;
-
-        ~Camera() override = default;
-
-        // Create camera with position and target
-        static Camera createLookAt(const glm::vec3& position,
-                                   const glm::vec3& target,
-                                   const glm::vec3& up = constants::WORLD_UP);
-
-        // Get view matrix
-        [[nodiscard]] const glm::mat4& getViewMatrix() const;
-
-        // Get projection matrix
-        [[nodiscard]] const glm::mat4& getProjectionMatrix() const;
-
-        // Set target for orbital camera
-        void setTarget(const glm::vec3& target);
-        void clearTarget();
-        void setOrbitDistance(float distance);
-
-        // Configuration methods
-        void setFieldOfView(float fov);
-        void setAspectRatio(float aspectRatio);
-        void setNearPlane(float nearPlane);
-        void setFarPlane(float farPlane);
-        void setCameraType(CameraType type);
-        void setCameraMode(CameraMode mode);
-        void setMouseSensitivity(float sensitivity);
-
-        // Other getters
-        [[nodiscard]] const CameraSettings& settings() const;
-        [[nodiscard]] std::optional<glm::vec3> optionalTarget() const;
-        [[nodiscard]] float getMouseSensitivity() const;
-
-        // Frustum extraction for culling
-        struct Frustum
-        {
-            enum Planes { Right, Left, Bottom, Top, Far, Near };
-
-            std::array<glm::vec4, 6> planes;
-        };
-
-        [[nodiscard]] Frustum extractFrustum() const;
-
-        // Culling methods
-        static bool isPointVisible(const glm::vec3& point, const Frustum& frustum);
-        static bool isSphereVisible(const glm::vec3& center, float radius, const Frustum& frustum);
-        static bool isAABBVisible(const glm::vec3& min, const glm::vec3& max, const Frustum& frustum);
-
-        // Utility methods
-        [[nodiscard]] glm::vec3 screenToWorld(const glm::vec2& screenPos, const glm::vec2& screenSize) const;
-
-        // Ray casting for picking
-        struct Ray
-        {
-            glm::vec3 origin;
-            glm::vec3 direction;
-        };
-
-        [[nodiscard]] Ray createRayFromScreen(const glm::vec2& screenPos, const glm::vec2& screenSize) const;
-
-        // Serialization support
-        [[nodiscard]] std::string serialize() const;
-
-        // Animation support
-        void interpolateTo(const Camera& target, float t);
+        glm::mat4 m_projectionMatrix{};
     };
 
-    // Input binding configuration
-    struct InputBinding
-    {
-        int key{ GLFW_KEY_UNKNOWN };
-        int mouseButton{ -1 };
-        bool isMouseMovement{ false };
-        bool isScrollWheel{ false };
-        CameraAction action{ CameraAction::MoveForward };
-    };
-
-    // Camera controller interface
-    class CameraController
-    {
-    public:
-        virtual ~CameraController() = default;
-        virtual void update(Camera& camera, float deltaTime) = 0;
-        virtual void processKeyInput(Camera& camera, int key, int action) = 0;
-        virtual void processMouseMovement(Camera& camera, float xOffset, float yOffset) = 0;
-        virtual void processMouseScroll(Camera& camera, float yOffset) = 0;
-        virtual void processMouseButton(Camera& camera, int button, int action) = 0;
-
-        // Input binding configuration
-        void setInputBindings(const std::vector<InputBinding>& bindings);
-        [[nodiscard]] const std::vector<InputBinding>& getInputBindings() const;
-
-    protected:
-        std::vector<InputBinding> m_inputBindings;
-        std::unordered_map<int, CameraAction> m_keyBindings;
-        std::unordered_map<int, CameraAction> m_mouseButtonBindings;
-        std::optional<CameraAction> m_mouseMovementBinding;
-        std::optional<CameraAction> m_scrollWheelBinding;
-
-        void rebuildBindingMaps();
-    };
-
-    // First-person camera controller
-    class FirstPersonController final : public CameraController
-    {
-    public:
-        explicit FirstPersonController(float initialX = 0.0f, float initialY = 0.0f);
-
-        void update(Camera& camera, float deltaTime) override;
-        void processKeyInput(Camera& camera, int key, int action) override;
-        void processMouseMovement(Camera& camera, float xPos, float yPos) override;
-        void processMouseScroll(Camera& camera, float yOffset) override;
-        void processMouseButton(Camera& camera, int button, int action) override;
-
-        // Set default bindings
-        void setDefaultBindings();
-
-    private:
-        bool m_keys[1024] = { false };
-        bool m_firstMouse{ true };
-        float m_lastX{ 0.0f };
-        float m_lastY{ 0.0f };
-        std::array<bool, static_cast<size_t>(CameraAction::ZoomOut) + 1> m_actionStates{};
-    };
-
-    // Orbital camera controller
-    class OrbitalController final : public CameraController
-    {
-    public:
-        explicit OrbitalController(float initialX = 0.0f, float initialY = 0.0f);
-
-        void update(Camera& camera, float deltaTime) override;
-        void processKeyInput(Camera& camera, int key, int action) override;
-        void processMouseMovement(Camera& camera, float xPos, float yPos) override;
-        void processMouseScroll(Camera& camera, float yOffset) override;
-        void processMouseButton(Camera& camera, int button, int action) override;
-
-        void setRotating(bool rotating);
-
-        // Set default bindings
-        void setDefaultBindings();
-
-    private:
-        bool m_rotating{ false };
-        float m_lastX{ 0.0f };
-        float m_lastY{ 0.0f };
-        std::array<bool, static_cast<size_t>(CameraAction::ZoomOut) + 1> m_actionStates{};
-    };
-
-    // Example usage with GLFW window
     class CameraSystem
     {
     public:
-        explicit CameraSystem(GLFWwindow* window, const Camera::CameraSettings& settings = {});
+        explicit CameraSystem(GLFWwindow* window);
 
-        void update();
-        [[nodiscard]] Camera& getCamera();
-        [[nodiscard]] const Camera& getCamera() const;
+        void update() noexcept;
 
-        // Configure input bindings
-        void setInputBindings(const std::vector<InputBinding>& bindings) const;
+        [[nodiscard]] Camera& getCamera() noexcept;
+
+        [[nodiscard]] const Camera& getCamera() const noexcept;
 
     private:
-        Camera m_camera;
-        std::unique_ptr<CameraController> m_controller;
-        GLFWwindow* m_window;
-        float m_lastFrameTime{ 0.0f };
+        void onWindowResize(int width, int height) const noexcept;
 
-        static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-        static void mouseCallback(GLFWwindow* window, double xPos, double yPos);
-        static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset);
-        static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+        GLFWwindow* m_window;
+        std::unique_ptr<Camera> m_camera;
     };
 } // lgl
 

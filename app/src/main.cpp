@@ -76,21 +76,7 @@ int main()
         return EXIT_FAILURE;
     }
 
-    glfwSetFramebufferSizeCallback(
-        window,
-        [](GLFWwindow*, const int width, const int height) -> void
-        {
-            currentWindowWidth = static_cast<float>(width);
-            currentWindowHeight = static_cast<float>(height);
-            glViewport(0, 0, width, height);
-        }
-    );
-
-    auto cameraSettings{ csv::Camera::DEFAULT_CAMERA_SETTINGS };
-    cameraSettings.mode = csv::CameraMode::FirstPerson;
-    cameraSettings.type = csv::CameraType::Perspective;
-    cameraSettings.aspectRatio = static_cast<float>(INITIAL_WINDOW_WIDTH) / static_cast<float>(INITIAL_WINDOW_HEIGHT);
-    csv::CameraSystem cameraSystem{ window, cameraSettings };
+    csv::CameraSystem cameraSystem{ window };
 
     constexpr auto segmentSize{ 100 };
     const auto vertices{ generateCircle<float, segmentSize>(0.5f) };
@@ -128,14 +114,12 @@ int main()
 
         processInput(window);
 
-        cameraSystem.getCamera().setAspectRatio(currentWindowWidth / currentWindowHeight);
-
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         circleShader.use();
         glBindVertexArray(vertexArrayObject);
-        circleShader.setUniform("model", glm::mat4(1.0f));
+        circleShader.setUniform("model", cameraSystem.getCamera().getModelMatrix());
         circleShader.setUniform("view", cameraSystem.getCamera().getViewMatrix());
         circleShader.setUniform("projection", cameraSystem.getCamera().getProjectionMatrix());
         glDrawArrays(GL_TRIANGLE_FAN, 0, segmentSize + 2);
