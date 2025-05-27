@@ -6,19 +6,19 @@
 #include <vector>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include "utilities/Shader.h"
+#include "utilities/ShaderProgram.h"
 
 constexpr auto INITIAL_WINDOW_WIDTH{ 800 };
 constexpr auto INITIAL_WINDOW_HEIGHT{ 600 };
 
 // Generate circle vertices
-template<std::floating_point T, std::size_t Segments>
+template<std::floating_point T, std::unsigned_integral U, std::size_t Segments>
 constexpr auto generateCircle(const T radius)
 {
     // Vertices: center point + Segments points on circumference, each with (x,y) coordinates
     std::array<T, 3 * (Segments + 1)> vertices{};
     // Indices: Segments triangles, each with 3 vertex indices
-    std::array<GLuint, 3 * Segments> indices{};
+    std::array<U, 3 * Segments> indices{};
 
     // Center vertex (v0)
     vertices[0] = 0;
@@ -93,15 +93,23 @@ int main()
         return EXIT_FAILURE;
     }
 
-    glfwSetFramebufferSizeCallback(window, [](GLFWwindow*, const int width, const int height) -> void
-    {
-        glViewport(0, 0, width, height);
-    });
+    glfwSetFramebufferSizeCallback(
+        window,
+        [](GLFWwindow*, const int width, const int height) -> void
+        {
+            glViewport(0, 0, width, height);
+        }
+    );
 
     constexpr auto segmentSize{ 100 };
-    const auto [vertices, indices]{ generateCircle<float, segmentSize>(0.5f) };
+//    const auto [vertices, indices]{ generateCircle<float, GLuint, segmentSize>(0.5f) };
+    std::array vertices{
+        -0.5f, -0.5f, 0.0f,
+        0.5f, -0.5f, 0.0f,
+        0.0f, 0.5f, 0.0f
+    };
 
-    const auto circleShader{ csv::Shader::load("shaders/circle.vert", "shaders/circle.frag") };
+    const auto circleShader{ csv::ShaderProgram::load("shaders/circle.vert", "shaders/circle.frag") };
 
     GLuint vertexArrayObject{};
     glGenVertexArrays(1, &vertexArrayObject);
@@ -109,8 +117,8 @@ int main()
     GLuint vertexBufferObject{};
     glGenBuffers(1, &vertexBufferObject);
 
-    GLuint elementBufferObject{};
-    glGenBuffers(1, &elementBufferObject);
+//    GLuint elementBufferObject{};
+//    glGenBuffers(1, &elementBufferObject);
 
     glBindVertexArray(vertexArrayObject);
 
@@ -128,11 +136,11 @@ int main()
                           nullptr);
     glEnableVertexAttribArray(0);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferObject);
-    glBufferData(elementBufferObject,
-                 indices.size() * sizeof(std::ranges::range_value_t<decltype(indices)>),
-                 indices.data(),
-                 GL_STATIC_DRAW);
+//    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferObject);
+//    glBufferData(elementBufferObject,
+//                 indices.size() * sizeof(std::ranges::range_value_t<decltype(indices)>),
+//                 indices.data(),
+//                 GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -146,17 +154,18 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
 
         circleShader.use();
+        glBindVertexArray(vertexArrayObject);
         circleShader.setUniform("model", glm::mat4(1.0f));
         circleShader.setUniform("view", glm::mat4(1.0f));
         circleShader.setUniform("projection", glm::mat4(1.0f));
-        glBindVertexArray(vertexArrayObject);
-        glDrawElements(GL_TRIANGLES,
-                       indices.size(),
-                       GL_UNSIGNED_INT,
-                       nullptr);
+//        glDrawElements(GL_TRIANGLES,
+//                       indices.size(),
+//                       GL_UNSIGNED_INT,
+//                       nullptr);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
 
-        glfwPollEvents();
         glfwSwapBuffers(window);
+        glfwPollEvents();
     }
 
     glDeleteVertexArrays(1, &vertexArrayObject);
