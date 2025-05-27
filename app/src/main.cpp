@@ -6,10 +6,15 @@
 #include <vector>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
+#include "utilities/Camera.h"
 #include "utilities/ShaderProgram.h"
 
 constexpr auto INITIAL_WINDOW_WIDTH{ 800 };
 constexpr auto INITIAL_WINDOW_HEIGHT{ 600 };
+
+float currentWindowWidth{ INITIAL_WINDOW_WIDTH };
+float currentWindowHeight{ INITIAL_WINDOW_HEIGHT };
 
 // Generate circle vertices
 template<std::floating_point T, std::size_t Segments>
@@ -75,9 +80,17 @@ int main()
         window,
         [](GLFWwindow*, const int width, const int height) -> void
         {
+            currentWindowWidth = static_cast<float>(width);
+            currentWindowHeight = static_cast<float>(height);
             glViewport(0, 0, width, height);
         }
     );
+
+    auto cameraSettings{ csv::Camera::DEFAULT_CAMERA_SETTINGS };
+    cameraSettings.mode = csv::CameraMode::FirstPerson;
+    cameraSettings.type = csv::CameraType::Perspective;
+    cameraSettings.aspectRatio = static_cast<float>(INITIAL_WINDOW_WIDTH) / static_cast<float>(INITIAL_WINDOW_HEIGHT);
+    csv::CameraSystem cameraSystem{ window, cameraSettings };
 
     constexpr auto segmentSize{ 100 };
     const auto vertices{ generateCircle<float, segmentSize>(0.5f) };
@@ -111,7 +124,11 @@ int main()
 
     while (!glfwWindowShouldClose(window))
     {
+        cameraSystem.update();
+
         processInput(window);
+
+        cameraSystem.getCamera().setAspectRatio(currentWindowWidth / currentWindowHeight);
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -119,9 +136,9 @@ int main()
         circleShader.use();
         glBindVertexArray(vertexArrayObject);
         circleShader.setUniform("model", glm::mat4(1.0f));
-        circleShader.setUniform("view", glm::mat4(1.0f));
-        circleShader.setUniform("projection", glm::mat4(1.0f));
-        glDrawArrays(GL_LINES, 0, segmentSize + 2);
+        circleShader.setUniform("view", cameraSystem.getCamera().getViewMatrix());
+        circleShader.setUniform("projection", cameraSystem.getCamera().getProjectionMatrix());
+        glDrawArrays(GL_TRIANGLE_FAN, 0, segmentSize + 2);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
