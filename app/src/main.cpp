@@ -12,42 +12,20 @@ constexpr auto INITIAL_WINDOW_WIDTH{ 800 };
 constexpr auto INITIAL_WINDOW_HEIGHT{ 600 };
 
 // Generate circle vertices
-template<std::floating_point T, std::unsigned_integral U, std::size_t Segments>
-constexpr auto generateCircle(const T radius)
+template<std::floating_point T, std::size_t Segments>
+constexpr std::array<T, 3 * (Segments + 2)> generateCircle(const T radius)
 {
-    // Vertices: center point + Segments points on circumference, each with (x,y) coordinates
-    std::array<T, 3 * (Segments + 1)> vertices{};
-    // Indices: Segments triangles, each with 3 vertex indices
-    std::array<U, 3 * Segments> indices{};
+    std::array<T, 3 * (Segments + 2)> vertices{};
+    constexpr auto tau{ static_cast<T>(2) * std::numbers::pi_v<T> };
 
-    // Center vertex (v0)
-    vertices[0] = 0;
-    vertices[1] = 0;
-    vertices[2] = 0;
-
-    // Generate vertices on the circumference
-    for (std::size_t i{ 0 }; i < Segments; ++i)
+    for (const auto index : std::views::iota(0uz, Segments + 1))
     {
-        const auto angle{ static_cast<T>(2) * std::numbers::pi_v<T> * static_cast<T>(i) / static_cast<T>(Segments) };
-        const auto index{ 3 * (i + 1) };
-
-        vertices[index] = radius * std::cos(angle); // x coordinate
-        vertices[index + 1] = radius * std::sin(angle); // y coordinate
-        vertices[index + 2] = 0; // z coordinate
+        const auto theta{ tau * static_cast<T>(index) / static_cast<T>(Segments) };
+        vertices[3 + index * 3 + 0] = radius * std::cos(theta);
+        vertices[3 + index * 3 + 1] = radius * std::sin(theta);
+        vertices[3 + index * 3 + 2] = static_cast<T>(0);
     }
-
-    // Generate triangle indices
-    // Each triangle connects the center (v0) with two adjacent vertices on the circumference
-    for (std::size_t i{ 0 }; i < Segments; ++i)
-    {
-        std::size_t index{ 3 * i };
-
-        indices[index] = 0; // Center vertex
-        indices[index + 1] = i + 1; // Current circumference vertex
-        indices[index + 2] = (i + 1) % Segments + 1; // Next circumference vertex (wraps around)
-    }
-
-    return std::make_pair(vertices, indices);
+    return vertices;
 }
 
 void processInput(GLFWwindow* window)
@@ -102,12 +80,7 @@ int main()
     );
 
     constexpr auto segmentSize{ 100 };
-//    const auto [vertices, indices]{ generateCircle<float, GLuint, segmentSize>(0.5f) };
-    std::array vertices{
-        -0.5f, -0.5f, 0.0f,
-        0.5f, -0.5f, 0.0f,
-        0.0f, 0.5f, 0.0f
-    };
+    const auto vertices{ generateCircle<float, segmentSize>(0.5f) };
 
     const auto circleShader{ csv::ShaderProgram::load("shaders/circle.vert", "shaders/circle.frag") };
 
@@ -117,14 +90,11 @@ int main()
     GLuint vertexBufferObject{};
     glGenBuffers(1, &vertexBufferObject);
 
-//    GLuint elementBufferObject{};
-//    glGenBuffers(1, &elementBufferObject);
-
     glBindVertexArray(vertexArrayObject);
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
-    glBufferData(vertexBufferObject,
-                 vertices.size() * sizeof(std::ranges::range_value_t<decltype(vertices)>),
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(std::ranges::range_value_t<decltype(vertices)>) * vertices.size(),
                  vertices.data(),
                  GL_STATIC_DRAW);
 
@@ -136,15 +106,8 @@ int main()
                           nullptr);
     glEnableVertexAttribArray(0);
 
-//    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferObject);
-//    glBufferData(elementBufferObject,
-//                 indices.size() * sizeof(std::ranges::range_value_t<decltype(indices)>),
-//                 indices.data(),
-//                 GL_STATIC_DRAW);
-
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -158,11 +121,7 @@ int main()
         circleShader.setUniform("model", glm::mat4(1.0f));
         circleShader.setUniform("view", glm::mat4(1.0f));
         circleShader.setUniform("projection", glm::mat4(1.0f));
-//        glDrawElements(GL_TRIANGLES,
-//                       indices.size(),
-//                       GL_UNSIGNED_INT,
-//                       nullptr);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawArrays(GL_LINES, 0, segmentSize + 2);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
