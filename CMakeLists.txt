@@ -10,4 +10,5 @@ find_package(glfw3 3.3 REQUIRED)
 find_package(glm CONFIG REQUIRED)
 
 add_subdirectory(glad)
+add_subdirectory(utilities)
 add_subdirectory(app)
